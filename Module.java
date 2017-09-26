@@ -1,16 +1,16 @@
-package homework01_202;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class Module {
 	private int baseAddress;
 	private ArrayList<Symbol> symbols;
-	private ArrayList<String> useList;
+	private HashMap<String, Integer> useList;
 	private ArrayList<String> word;
 
 	public Module() {
 		this.baseAddress = 0;
 		this.symbols = new ArrayList<Symbol>();
-		this.useList = new ArrayList<String>();
+		this.useList = new HashMap<String, Integer>();
 		this.word = new ArrayList<String>();
 	}
 
@@ -22,7 +22,11 @@ public class Module {
 		this.baseAddress = baseAddress;
 	}
 
-	public Symbol getSymbols(int index) {
+	public ArrayList<Symbol> getSymbols() {
+		return this.symbols;
+	}
+	
+	public Symbol getOneSymbol(int index) {
 		return this.symbols.get(index);
 	}
 	
@@ -36,16 +40,26 @@ public class Module {
 		return 0;
 	}
 	
+	public int getRealSymbolAddress(String sym, int baseAddress) {
+
+		for (int i = 0; i < this.symbols.size(); i++) {
+			if (sym.equals(this.symbols.get(i).getVariable())) {
+				return this.symbols.get(i).getRealAddress(baseAddress);
+			}
+		}
+		return 0;
+	}
+	
 	public void setSymbols(Symbol symbols) {
 		this.symbols.add(symbols);
 	}
 
-	public ArrayList<String> getUseList() {
+	public HashMap<String, Integer> getUseList() {
 		return useList;
 	}
 
-	public void setUseList(String useList) {
-		this.useList.add(useList);
+	public void setUseList(String symbol, int loc) {
+		this.useList.put(symbol,loc);
 	}
 
 	public ArrayList<String> getWord() {
@@ -55,6 +69,8 @@ public class Module {
 	public void setWord(String word) {
 		this.word.add(word);
 	}
+	
+	
 
 	@Override
 	public String toString() {

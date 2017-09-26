@@ -1,14 +1,19 @@
-package homework01_202;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Scanner;
+import java.util.Set;
 
 public class DualPassLinker {
 
 	private static ArrayList<Module> listOfModules = new ArrayList<Module>();
-	private static HashMap<String, Integer> SymbolTable = new HashMap<String, Integer>();
+	private static ArrayList<Integer> memoryMap = new ArrayList<Integer>();
+	
 
 	
 	public static void main(String[] args) {
@@ -61,8 +66,6 @@ public class DualPassLinker {
 			listOfModules.add(new Module());
 			
 		}
-		
-		System.out.println(lines);
 		
 		int countModule = 0;
 		int countLine = 1;
@@ -121,7 +124,7 @@ public class DualPassLinker {
 						
 						Symbol sym = new Symbol(lines.get(shift), Integer.parseInt(lines.get(shift + 1)));
 						
-						System.out.println(sym.toString());
+						
 						
 						//now add the symbol to the correct module
 						listOfModules.get(countModule).setSymbols(sym);
@@ -163,7 +166,8 @@ public class DualPassLinker {
 						
 
 						
-						listOfModules.get(countModule).setUseList(lines.get(shift));
+						listOfModules.get(countModule).setUseList(lines.get(shift),
+								Integer.parseInt(lines.get(shift+1)));
 						
 						shift += 1;
 						
@@ -190,8 +194,8 @@ public class DualPassLinker {
 						
 
 						
-						listOfModules.get(countModule).setUseList(lines.get(shift));
-						
+						listOfModules.get(countModule).setUseList(lines.get(shift),
+								Integer.parseInt(lines.get(shift+1)));
 						shift += 2;
 						
 					}
@@ -257,13 +261,199 @@ public class DualPassLinker {
 			
 		}
 		
-		System.out.println(listOfModules.get(0).toString());
-		System.out.println(listOfModules.get(1).toString());
-		System.out.println(listOfModules.get(2).toString());
-		System.out.println(listOfModules.get(3).toString());	
-		
 		//print out the symbol table
+		int moduleSize = listOfModules.size();
+		System.out.println("Symbol Table:");
 		
+		for(int i=0; i< moduleSize; i++) {
+			
+			Module mod = listOfModules.get(i);
+			
+			//check if each individual module has a symbol in it
+			int numSymbol = mod.getSymbols().size();
+			
+			if(numSymbol > 0) {
+				
+				for(int j=0; j< numSymbol; j++) {
+					
+					mod.getOneSymbol(j).setRealAddress(mod.getBaseAddress() + 
+							mod.getOneSymbol(j).getAddress());
+					
+					System.out.println(mod.getOneSymbol(j).toString(mod.getBaseAddress()));
+		
+				}
+				
+			}
+			
+		}
+
+		
+		
+		//now complete the second pass and do the memory map
+		for(int moduleNumber=0; moduleNumber < listOfModules.size(); moduleNumber++) {
+			
+			ArrayList<String> currentWordList = listOfModules.get(moduleNumber).getWord();
+			
+			//get the use list and create a counter for the correct symbol you have to use
+			//based upon the sentinel 
+			int sentinelCounter = -1;
+			
+			//this contains reference symbols that show the location that the symbol was used
+			//within the individual module
+			HashMap<String, Integer> useList = listOfModules.get(moduleNumber).getUseList();
+			
+			//these are the actual keys/symbols that we will need to compute their address 
+			//which we will later change individual words
+			String[] actualUseList = useList.keySet().toArray(new String[useList.size()]);
+
+			
+			ArrayList<Integer> useListLocations = new ArrayList<Integer>();
+			
+			
+			//fill the useListLocations with the correct locations
+			for(int i = 0; i<actualUseList.length; i++) {
+				
+				int symbolAddress = findLocation(actualUseList[i]);
+				useListLocations.add(symbolAddress);
+				
+			}
+		
+			
+			for(int wordNumber=0; wordNumber < currentWordList.size(); wordNumber++) {
+				
+				//now check each and every individual word and change the values if necessary
+				//first look at the last number
+				String currentWord = currentWordList.get(wordNumber);
+				
+				//add the char value to an empty string before parsing the int because parseInt
+				//only takes a String not char
+				int lastNum = Integer.parseInt((""+ currentWord.charAt(currentWord.length() - 1)));
+				
+				//now check what to do with the rest of the word based on the last number
+				
+				//in this case don't do anything to the address except get rid of the last
+				//digit
+				if(lastNum == 1 || lastNum == 2) {
+					
+					String address = currentWord.substring(0, currentWord.length()-1);
+					int intAddress = Integer.parseInt(address);
+					memoryMap.add(intAddress);
+				}
+				
+				//add the base address to the current address
+				else if(lastNum == 3) {
+					
+					String address = currentWord.substring(0, currentWord.length()-1);
+					int intAddress = Integer.parseInt(address);
+					int baseAddress = listOfModules.get(moduleNumber).getBaseAddress();
+					
+					int newAddress = intAddress+baseAddress;
+					memoryMap.add(newAddress);
+					
+				}
+				
+				//have to resolve the external 
+				else {
+					
+					
+					//do nothing because you have to resolve it separate from the other words	
+					
+				
+				}
+				
+				
+			}
+			
+			//get the start of the linked list for one symbol
+			for(int k=0; k<useList.size();k++){
+				
+				//gives us the location to look at the module
+				int symIndex = useList.get(actualUseList[k]);
+				
+				String currentSymWord = currentWordList.get(symIndex);
+				
+				//the thing we will actually add to and change now 
+				String address = currentSymWord.substring(0, currentSymWord.length()-1);
+				
+				int address2 = Integer.parseInt(address);
+				
+				
+				address2 = address2 / 1000;
+				
+				address2 *= 1000;
+				
+				address2 += findLocation(actualUseList[k]);
+				
+				memoryMap.add(address2);
+				
+				//the address we will use to find the next word to change
+				int nextAddress = Integer.parseInt(currentSymWord.substring(1, 
+						currentSymWord.length()-1))%100;
+				
+				if(nextAddress == 77) {
+					
+					String newWord = currentWordList.get(symIndex);
+					
+					String newAddress = newWord.substring(0, newWord.length()-1);
+					
+					int cleanAddress = Integer.parseInt(newAddress);
+					
+					
+					cleanAddress = cleanAddress / 1000;
+					
+					cleanAddress *= 1000;
+					
+					cleanAddress += findLocation(actualUseList[k]);
+					
+					memoryMap.add(address2);
+				}
+				
+				else {
+					
+					System.out.println("do something");
+					
+				}
+				
+			}
+			
+		}
+		
+		System.out.println();
+		//print out the memory map
+		System.out.println("Memory Map");
+		int counter = 0;
+		
+		for(int i=0; i<memoryMap.size(); i++) {
+			
+			System.out.print(counter+": ");
+			System.out.println(memoryMap.get(i));
+			counter++;
+			
+		}
+		
+		
+	}
+	
+	
+	public static int findLocation(String symbol) {
+		
+		for(int i=0; i<listOfModules.size();i++) {
+			
+			ArrayList<Symbol> symbolList = listOfModules.get(i).getSymbols();
+			
+			for(int j=0; j < symbolList.size(); j++ ) {
+				
+				if(symbolList.get(j).getVariable().equals(symbol)) {
+					
+					return symbolList.get(j).getRealAddress();
+					
+				}
+				
+			}
+			
+		}
+		
+		return 0;
 		
 		
 	}
