@@ -1,0 +1,46 @@
+
+A = arrival time
+B = input to randomOS function that gives the boundary of the function
+C = total CPU time
+M = the multiplier to calculate I/O time
+
+I/O Burst = previous CPU time burst * M
+CPU Burst = randomOS output
+
+						   A B C D
+The original input was: 1 (0 1 5 1) 
+The (sorted) input is:  1 (0 1 5 1) 
+
+This detailed printout gives the state and remaining burst for each process
+
+Before cycle    0:   unstarted  0.
+Before cycle    1:     running  1.
+Before cycle    2:     blocked  1.
+Before cycle    3:     running  1.
+Before cycle    4:     blocked  1.
+Before cycle    5:     running  1.
+Before cycle    6:     blocked  1.
+Before cycle    7:     running  1.
+Before cycle    8:     blocked  1.
+Before cycle    9:     running  1.
+
+
+
+Process 0:
+	(A,B,C,M) = (0,1,5,1)
+	Finishing time: 9
+	Turnaround time: 9 (finishing time - A)
+	I/O time: 4 (time in Blocked state)
+	Waiting time: 0 (time in Ready state)
+
+Summary Data:
+	Finishing time: 9
+	CPU Utilization: 0.555556 (percentage of time some job is running)
+	I/O Utilization: 0.444444 (percentage of time some job is blocked)
+	Throughput: 11.111111 processes per hundred cycles (processes completed per hundred time units)
+	Average turnaround time: 9.000000
+	Average waiting time: 0.000000
+
+
+
+
