@@ -222,10 +222,8 @@ def first_in_first_out(process_array):
 				if((process in ready_array) == False):
 					ready_array.append(process)
 
-				for i in range(0,len(ready_array)):
-					print(ready_array[i].toString(), cycle)
-
-				print(len(ready_array))
+				# for i in range(0,len(ready_array)):
+				# 	print(ready_array[i].toString(), cycle)
 
 
 				if(process.index == 0):
@@ -266,6 +264,31 @@ def first_in_first_out(process_array):
 			#dealing with the process that is READY
 			elif(process.current_state == "ready"):
 
+				#check if it is the last process if so then treat it differently
+				if(process.index == num_process-1):
+
+					make_running = True
+
+					for j in range(0,len(process_array)):
+
+						if(process_array[j].current_state == "running"):
+							make_running = False
+
+					if(make_running):
+
+						process.current_state = "running"
+						#calculate the randomOS time for the single burst
+						process.cpu_burst = randomOS(process.b_value)
+
+						#if the burst is greater than the cpu time left set it equal to that
+						if(process.cpu_burst > process.cpu_time):
+							process.cpu_burst = process.cpu_time
+
+						#calcualte the I/O burst
+						process.i_o_burst = process.cpu_burst * process.multiplier
+						break
+
+
 				#we have to decide whether to keep it in ready or see if we will change it to running
 				#look through the remaining processes that need to be processed in this cycle
 				for i in range(0,len(process_array)):
@@ -281,6 +304,12 @@ def first_in_first_out(process_array):
 						 	process.current_state = "ready"
 						 	ready_array.append(process)
 						 	break
+
+						 elif((process_array[i].index > process.index)):
+						 	if(process_array[i].cpu_burst > 1):
+						 		process.current_state = "ready"
+						 		ready_array.append(process)
+						 		break
 
 
 						 elif(process_array[i].index > process.index and (process_array[i].cpu_burst == 1)):
@@ -352,20 +381,39 @@ def first_in_first_out(process_array):
 						for i in range(0,len(process_array)):
 							#if another process is running that isn't the current process then set it to ready 
 							#check to make sure that it might be done running after this cycle
-							if((process_array[i].current_state == "running") and (process_array[i].index < process.index)):
-								if(process_array[i].cpu_burst != 1):
+							if(((process_array[i].current_state == "running") or (process_array[i].current_state == "blocked")) and (process_array[i].index < process.index)):
+								if(process_array[i].cpu_burst > 1):
 									process.current_state = "ready"
 									ready_array.append(process)
-									
+									break
+
+								elif(process_array[i].i_o_burst >= 1):
+
+									for j in range(process.index+1,len(process_array)):
+										if(process_array[j].current_state == ("running") and (process_array[j].cpu_burst > 1)):
+											process.current_state = "ready"
+											ready_array.append(process)
+											break
+										elif(process_array[j].current_state == ("blocked") and (process_array[j].i_o_burst > 1)):
+											break
+
+
+							elif((process_array[i].current_state == "running") and (process_array[i].index > process.index)):
+								if(process_array[i].cpu_burst > 1):
+									process.current_state = "ready"
+									ready_array.append(process)
 									break
 
 							#check if there is another process that is also ready and if it has an earlier arrival time
 							elif((process_array[i].current_state == "ready") and (process_array[i].index > process.index)):
 								process.current_state = "ready"
-
 								ready_array.append(process)
 								break
-								
+
+							elif((process_array[i].current_state == "ready") and (process_array[i].index < process.index) and (process.current_state=="ready")):
+								process.current_state = "ready"
+								ready_array.append(process)
+								break								
 
 							#check if there is another blocked process that may finish at the same time
 							elif((process_array[i].current_state == "blocked") and (process_array[i].index < process.index) and (len(process_list) > process.index)):
@@ -412,9 +460,10 @@ def first_in_first_out(process_array):
 			if((process_array[i].current_state == "running") and (process_array[i] in ready_array)):
 				ready_array.remove(process_array[i])
 
-		print(process_array[0].toString() + " " + process_array[0].current_state,process_array[1].toString() + " " + process_array[1].current_state,process_array[2].toString() + " " + process_array[2].current_state,)
+		#print(process_array[0].toString() + " " + process_array[0].current_state,process_array[1].toString() + " " + process_array[1].current_state,process_array[2].toString() + " " + process_array[2].current_state,)
 		cycle += 1
 
+#MAKE A FOR LOOP THAT IS GOING TO CHECK AT THE END OF EACH ROUND IF ANYTHING BESIDES READY IS DUPLICATED TO DETECT ERRORS
 
 
 	print("The scheduling algorithm used was First Come First Served")
