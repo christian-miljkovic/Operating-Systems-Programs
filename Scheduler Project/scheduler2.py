@@ -654,7 +654,8 @@ def round_robbin(process_array,quantum):
 		if(VERBOSE_FLAG):
 			verbose_function(process_array,cycle)
 
-
+		#pdb.set_trace()
+		
 		#this is the initial check getting processes from state: unstarted to ready or running
 		for i in range(0,len(process_array)):
 
@@ -677,13 +678,13 @@ def round_robbin(process_array,quantum):
 
 			make_pop = False
 			pop_array = []
-			ready_array = []
 
 
 			for i in range(0,len(process_queue)):
 
+
 				#check if has been set to running yet if it is unstarted or a first arrived ready process
-				if(((process_queue[i].current_state == "unstarted") or (process_queue[i].current_state == "ready") or (process_queue[i].current_state == "blocked")) and (i == 0) and (len(process_queue)==0)):
+				if(((process_queue[i].current_state == "unstarted") or (process_queue[i].current_state == "ready") or (process_queue[i].current_state == "blocked")) and (i == 0)):
 
 					process_queue[i].current_state = "running"
 
@@ -691,22 +692,53 @@ def round_robbin(process_array,quantum):
 					#compute the cpu burst
 					#calculate the randomOS time for the single burst
 					process_queue[i].cpu_burst = randomOS(process_queue[i].b_value)
+					process_queue[i].original_cpu_burst = process_queue[i].cpu_burst
+
+					if(process_queue[i].cpu_burst > quantum):
+						process_queue[i].cpu_burst = quantum
 
 					#if the burst is greater than the cpu time left set it equal to that
 					if(process_queue[i].cpu_burst > process_queue[i].cpu_time):
-						process_queue[i].cpu_burst = process_queue[i].cpu_time
+						process_queue[i].original_cpu_burst = process_queue[i].cpu_time
 
 					#calcualte the I/O burst
-					process_queue[i].i_o_burst = process_queue[i].cpu_burst * process_queue[i].multiplier
+					process_queue[i].i_o_burst = process_queue[i].original_cpu_burst * process_queue[i].multiplier
+
+				elif((process_queue[i].current_state == "blocked") and (i >0)):
+
+					if(process_queue[i].i_o_burst == 1):
+						process_queue[i].i_o_burst -= 1
+
+					if(process_queue[0].current_state == "terminated" or process_queue[0].current_state == "blocked" and i==1):
+						process_queue[i].current_state = "running"
+
+					else:
+						process_queue[i].current_state = "ready"
+
+				elif((process_queue[i].current_state == "running") and (i == 0) and (process_queue[i].cpu_burst < process_queue[i].original_cpu_burst)):
+
+					if(process_queue[i].cpu_burst > 0):
+						process_queue[i].cpu_burst -= 1
+						process_queue[i].original_cpu_burst -= 1
+
+					if(process_queue[i].cpu_time > 0):
+						process_queue[i].cpu_time -= 1
+
+					if((process_queue[i].original_cpu_burst == 0) and (process_queue[i].cpu_time == 0)):
+						process_queue[i].current_state = "terminated"
+						process_queue[i].finishing_time = cycle
+						process_queue[i].turn_around_time = process_queue[i].finishing_time - process_queue[i].arrival_time
+						#now pop the process because we are done with running it
+						pop_array.append(process_queue[i])
+
+					#prempt it here
+					elif((process_queue[i].cpu_burst == 0) and (process_queue[i].original_cpu_burst > process_queue[i].cpu_burst)):
+						process_queue[i].current_state = "ready"
+						pop_array.append(process_queue[i])
+
 
 				#if the first index process is running then we compute how much more is it running for
 				elif((process_queue[i].current_state == "running") and (i == 0)):
-
-
-					if((cycle % quantum == 0) and (process_queue[i].original_cpu_time - process_queue[i].cpu_time >= quantum)):
-						process_queue[i].current_state = "ready"
-						ready_array.append(process_queue[i])
-
 
 					if(process_queue[i].cpu_burst > 0):
 						process_queue[i].cpu_burst -= 1
@@ -715,8 +747,9 @@ def round_robbin(process_array,quantum):
 						process_queue[i].cpu_time -= 1
 
 
+
 					#now figure out whether to turn into blocked process or terminated else keep running and same position
-					elif((process_queue[i].cpu_burst == 0) and (process_queue[i].cpu_time == 0)):
+					if((process_queue[i].cpu_burst == 0) and (process_queue[i].cpu_time == 0)):
 						
 						process_queue[i].current_state = "terminated"
 						process_queue[i].finishing_time = cycle
@@ -752,19 +785,18 @@ def round_robbin(process_array,quantum):
 						#compute the cpu burst
 						#calculate the randomOS time for the single burst
 						process_queue[1].cpu_burst = randomOS(process_queue[1].b_value)
+						process_queue[1].original_cpu_burst = process_queue[1].cpu_burst
+
+						if(process_queue[1].cpu_burst > quantum):
+							process_queue[1].cpu_burst = quantum						
 
 						#if the burst is greater than the cpu time left set it equal to that
 						if(process_queue[1].cpu_burst > process_queue[1].cpu_time):
-							process_queue[1].cpu_burst = process_queue[1].cpu_time
+							process_queue[1].original_cpu_burst = process_queue[1].cpu_time
 
 
 						#calcualte the I/O burst
-						process_queue[1].i_o_burst = process_queue[1].cpu_burst * process_queue[1].multiplier
-
-			if(len(ready_array) > 0):
-				for l in range(0,len(ready_array)):
-					process_queue.remove(ready_array[l])
-					process_queue.append(ready_array[l])
+						process_queue[1].i_o_burst = process_queue[1].original_cpu_burst * process_queue[1].multiplier
 
 
 			temp_array = []
@@ -775,12 +807,19 @@ def round_robbin(process_array,quantum):
 
 					if(pop_array[i].current_state == "terminated"):
 						process_queue.remove(pop_array[i])
+
+					elif(pop_array[i].current_state == "ready" and process_queue[0].index == pop_array[i].index):
+
+						temp_process = process_queue.pop(0)
+						process_queue.append(temp_process)
+
 					else:
 						temp_array.append(pop_array[i])
 						process_queue.remove(pop_array[i])
 				pop_array = []
 
-
+			
+			#if it is turned to blocking above it will then set this
 			#update any blocked processes
 			if(len(blocking_list) > 0):
 
@@ -788,82 +827,104 @@ def round_robbin(process_array,quantum):
 
 				for i in range(0,len(blocking_list)):
 
+
+
 					#if it is done with i/o then put it back on the queue
-					if(blocking_list[i].i_o_burst > 0):
+					if(blocking_list[i].i_o_burst == 1):
 						
-
-						
-
 						#now we determine if its going to be running or ready
 						if(len(process_queue) == 0):
 
-							
-							# #if it is the first one to be on the ready queue then we compute all the neccesary parameters
-							# if(blocking_list[i].current_state != "terminated"):
+							#pdb.set_trace()
 
+							if(blocking_list[i].time_waited > 0):
 
-							# 	blocking_list[i].current_state = "running"
+								#problem here is if it just got blocked
+								blocking_list[i].current_state = "running"
+								blocking_list[i].time_waited = 0
 								
 
-							# 	#compute the cpu burst
-							# 	#calculate the randomOS time for the single burst
-							# 	blocking_list[i].cpu_burst = randomOS(blocking_list[i].b_value)
+								#compute the cpu burst
+								#calculate the randomOS time for the single burst
+								blocking_list[i].cpu_burst = randomOS(blocking_list[i].b_value)
+								blocking_list[i].original_cpu_burst = blocking_list[i].cpu_burst
 
-							# 	#if the burst is greater than the cpu time left set it equal to that
-							# 	if(blocking_list[i].cpu_burst > blocking_list[i].cpu_time):
-							# 		blocking_list[i].cpu_burst = blocking_list[i].cpu_time
+								if(blocking_list[i].cpu_burst > quantum):
+									blocking_list[i].cpu_burst = quantum								
 
-							# 	#calcualte the I/O burst
-							# 	blocking_list[i].i_o_burst = blocking_list[i].cpu_burst * blocking_list[i].multiplier
-							process_queue.append(blocking_list[i])
-							removal_list.append(blocking_list[i])
+								#if the burst is greater than the cpu time left set it equal to that
+								if(blocking_list[i].cpu_burst > blocking_list[i].cpu_time):
+									blocking_list[i].original_cpu_burst = blocking_list[i].cpu_time
+
+								#calcualte the I/O burst
+								blocking_list[i].i_o_burst = blocking_list[i].original_cpu_burst * blocking_list[i].multiplier
+
+								process_queue.append(blocking_list[i])
+								removal_list.append(blocking_list[i])
+
+							else:
+								blocking_list[i].time_waited += 1
+
 
 
 								
 
 						#otherwise we know that it isn't the first
 						else:
-							#check if the current process that is first on the index is blocked or terminated and just hasnt been popped yet
-							if((process_queue[0].current_state == "terminated") or (process_queue[0].current_state == "blocked") and (i>0)):
-								
-								blocking_list[i].current_state = "running"
-								
-								#compute the cpu burst
-								#calculate the randomOS time for the single burst
-								blocking_list[i].cpu_burst = randomOS(blocking_list[i].b_value)
 
-								#if the burst is greater than the cpu time left set it equal to that
-								if(blocking_list[i].cpu_burst > blocking_list[i].cpu_time):
-									blocking_list[i].cpu_burst = blocking_list[i].cpu_time
+							if(blocking_list[i].time_waited > 0):
+
+								#check if the current process that is first on the index is blocked or terminated and just hasnt been popped yet
+								if((process_queue[0].current_state == "terminated") or (process_queue[0].current_state == "blocked") and (i>0)):
+									
+									blocking_list[i].current_state = "running"
+									blocking_list[i].time_waited = 0
+									
+									#compute the cpu burst
+									#calculate the randomOS time for the single burst
+									blocking_list[i].cpu_burst = randomOS(blocking_list[i].b_value)
+									blocking_list[i].original_cpu_burst = blocking_list[i].cpu_burst
+
+									if(blocking_list[i].cpu_burst > quantum):
+										blocking_list[i].cpu_burst = quantum									
+
+									#if the burst is greater than the cpu time left set it equal to that
+									if(blocking_list[i].cpu_burst > blocking_list[i].cpu_time):
+										blocking_list[i].original_cpu_burst = blocking_list[i].cpu_time
 
 
-								#calcualte the I/O burst
-								blocking_list[i].i_o_burst = blocking_list[i].cpu_burst * blocking_list[i].multiplier
-								process_queue.append(blocking_list[i])
-								removal_list.append(blocking_list[i])
-								
+									#calcualte the I/O burst
+									blocking_list[i].i_o_burst = blocking_list[i].original_cpu_burst * blocking_list[i].multiplier
+									process_queue.append(blocking_list[i])
+									removal_list.append(blocking_list[i])
+									
 
 
-							else:
+								elif((process_queue[0].current_state == "running")):
 
-								##try making it so that if you know that it is a smaller index and only has 1 cpu burst left
-								if(blocking_list[i].index != process_queue[0].index):
+									##try making it so that if you know that it is a smaller index and only has 1 cpu burst left
 									blocking_list[i].current_state = "ready"
+									blocking_list[i].time_waited = 0
 
-								process_queue.append(blocking_list[i])
-								removal_list.append(blocking_list[i])
-
-
+									process_queue.append(blocking_list[i])
+									removal_list.append(blocking_list[i])
+							else:
+								blocking_list[i].time_waited += 1
+								
+					
 
 					#otherwise it is not done blocking
 					else:
 						blocking_list[i].i_o_burst -= 1
+						blocking_list[i].time_waited += 1
 
 				for i in range(0,len(removal_list)):
 					blocking_list.remove(removal_list[i])	
 			
 		#this is if there are no more process ready or running
 		elif(len(process_queue)==0):
+
+			removal_list2 = []
 
 			for i in range(0,len(process_array)):
 
@@ -883,29 +944,33 @@ def round_robbin(process_array,quantum):
 							if(len(process_queue) == 0):
 
 								#if it is the first one to be on the ready queue then we compute all the neccesary parameters
-
+								#problem is here where if if just got blocked
 								process_array[i].current_state = "running"
-								
-
 
 								#compute the cpu burst
 								#calculate the randomOS time for the single burst
 								process_array[i].cpu_burst = randomOS(process_array[i].b_value)
+								process_array[i].original_cpu_burst = process_array[i].cpu_burst
+
+								if(process_array[i].cpu_burst > quantum):
+									process_array[i].cpu_burst = quantum								
 
 								#if the burst is greater than the cpu time left set it equal to that
 								if(process_array[i].cpu_burst > process_array[i].cpu_time):
-									process_array[i].cpu_burst = process_array[i].cpu_time
+									process_array[i].original_cpu_burst = process_array[i].cpu_time
 
 								#calcualte the I/O burst
-								process_array[i].i_o_burst = process_array[i].cpu_burst * process_array[i].multiplier
+								process_array[i].i_o_burst = process_array[i].original_cpu_burst * process_array[i].multiplier
 
 								process_queue.append(process_array[i])
+								removal_list2.append(process_array[i])
 
 
 							#otherwise we know that it isn't the first
 							else:
 								process_array[i].current_state = "ready"
 								process_queue.append(process_array[i])
+								removal_list2.append(process_array[i])
 
 						#we know that cpu time isnt done
 						else:
@@ -915,6 +980,9 @@ def round_robbin(process_array,quantum):
 					#otherwise it is not done blocking
 					else:
 						process_array[i].i_o_burst -= 1
+
+			for i in range(0,len(removal_list2)):
+				blocking_list.remove(removal_list2[i])
 
 		
 		if(len(unstarted_list) > 0):
@@ -934,13 +1002,17 @@ def round_robbin(process_array,quantum):
 					#compute the cpu burst
 					#calculate the randomOS time for the single burst
 					unstarted_list[i].cpu_burst = randomOS(unstarted_list[i].b_value)
+					unstarted_list[i].original_cpu_burst = unstarted_list[i].cpu_burst
+
+					if(unstarted_list[i].cpu_burst > quantum):
+						unstarted_list[i].cpu_burst = quantum					
 
 					#if the burst is greater than the cpu time left set it equal to that
 					if(unstarted_list[i].cpu_burst > unstarted_list[i].cpu_time):
-						unstarted_list[i].cpu_burst = unstarted_list[i].cpu_time
+						unstarted_list[i].original_cpu_burst = unstarted_list[i].cpu_time
 
 					#calcualte the I/O burst
-					unstarted_list[i].i_o_burst = unstarted_list[i].cpu_burst * unstarted_list[i].multiplier
+					unstarted_list[i].i_o_burst = unstarted_list[i].original_cpu_burst * unstarted_list[i].multiplier
 
 					process_queue.append(unstarted_list[i])
 					removal_list_unstarted.append(unstarted_list[i])
@@ -955,9 +1027,12 @@ def round_robbin(process_array,quantum):
 				unstarted_list.remove(removal_list_unstarted[i])
 
 		if(len(temp_array) > 0):
-			blocking_list.append(temp_array[0])
-			temp_array.remove(temp_array[0])
-		
+			for i in range(0,len(temp_array)):
+				if(temp_array[i].current_state == "blocked"):
+					temp_array[i].time_waited += 1
+					blocking_list.append(temp_array[i])
+					temp_array.remove(temp_array[i])
+			
 		#check if the processes are terminated
 		for i in range(0,len(process_array)):
 			if(process_array[i].current_state == "terminated"):
@@ -979,14 +1054,14 @@ def round_robbin(process_array,quantum):
 
 		
 		cycle += 1
-
-	print("The scheduling algorithm used was First Come First Served")
+		#pdb.set_trace()
+	print("The scheduling algorithm used was Round Robbin")
 	print("")
 	for i in range(0,len(process_array)):
 		process_array[i].summary()
 	full_summary(process_array,num_process)
 
-#round_robbin(process_array,2)
+round_robbin(process_array,2)
 
 def shortest_job_first(new_process_array):
 
@@ -1418,13 +1493,13 @@ def shortest_job_first(new_process_array):
 		
 		cycle += 1
 		#pdb.set_trace()
-	print("The scheduling algorithm used was First Come First Served")
+	print("The scheduling algorithm used was Shortest Job First")
 	print("")
 	for i in range(0,len(print_array)):
 		print_array[i].summary()
 	full_summary(print_array,num_process)
 
-shortest_job_first(process_array)
+#shortest_job_first(process_array)
 
 
 
