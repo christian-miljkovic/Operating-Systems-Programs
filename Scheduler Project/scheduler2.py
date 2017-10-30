@@ -3,7 +3,7 @@ import sys
 import time
 import random
 from queue import *
-import pdb 
+
 
 VERBOSE_FLAG = False; 
 
@@ -135,115 +135,113 @@ def full_summary(process_array,num_process):
 	print("\tAverage waiting time: "+ str(avg_wait))
 
 
+def start_up():
+
+	#check to see if the verbose flag was used and 
+	#read in the file for the process information
+	if(len(sys.argv) == 3):
+		VERBOSE_FLAG = True; 
+		process_file = open(sys.argv[2])
+
+	else:
+		process_file = open(sys.argv[1])
+		VERBOSE_FLAG = False
+
+
+	#get the number of processes
+	num_process = int(process_file.read(1))
+
+	#this is where we get the single first line that contains the information
+	#this will be a single string
+	process_line = process_file.readline()
+
+	#break down the process_list string into an array that contains an array of ints
+	#that represent the information for each process
+	process_nums = [int(s) for s in process_line.split() if s.isdigit()]
+
+	#in the case there are more than one process use the while loop
+	#otherwise it isn't neccesary
+
+	#now create an array of processes with the information provided by process_list
+	process_array = []
+
+	if(process_nums != 1):
+
+		process_list = []
+		temp_array = []
+
+		#now divide each set of numbers into their respective process
+		process_count = 0
+		index = 0
+
+		#this while loop simply split the array up and puts them into individual arrays for later
+		#conversion to processes
+		while(process_count < num_process):
+
+			
+
+			temp_array.append(process_nums[index])
+
+			index += 1
+
+			if((index % 4) == 0):
+				process_count += 1
+				process_list.append(temp_array)
+				temp_array = []
+
+		for i in range(0, len(process_list)):
+
+			#dont do the randomOS function here because you recalculate that every cycle
+			process = Process(int(process_list[i][0]),int(process_list[i][1]),int(process_list[i][2]),int(process_list[i][3]))
+
+			process_array.append(process)
+
+	else:
+		process_array.append(Process(int(process_nums[0]),int(process_list[1]),int(process_nums[2]),int(process_nums[3])))
 
 
 
+	#sort the array by checking arrival times
+	def bubble_sort_arrival(arr):
+	    check = True
+	    while check:
+	        check = False
+	        for i in range(0,len(arr)-1):
+	            if arr[i].arrival_time > arr[i+1].arrival_time:
+	                arr[i], arr[i+1] = arr[i+1], arr[i]
+	                check = True
 
+	#print out the initial heading have to convert the array into a string
+	header_string = "The original input was: " + str(num_process) + " "
 
+	for i in range(0,len(process_array)):
+		header_string += process_array[i].toString() + " "
 
+	header_string += "\n" + "The sorted input is: " + str(num_process) + " "
 
-#check to see if the verbose flag was used and 
-#read in the file for the process information
-if(len(sys.argv) == 3):
-	VERBOSE_FLAG = True; 
-	process_file = open(sys.argv[2])
+	bubble_sort_arrival(process_array)
 
-else:
-	process_file = open(sys.argv[1])
+	#now set the index of each process later so that we can properly print out their details and keep track of them
+	for i in range(0,len(process_array)):
+		process_array[i].index = i
 
+	for i in range(0,len(process_array)):
+		header_string += process_array[i].toString() + " "
 
-#get the number of processes
-num_process = int(process_file.read(1))
-
-#this is where we get the single first line that contains the information
-#this will be a single string
-process_line = process_file.readline()
-
-#break down the process_list string into an array that contains an array of ints
-#that represent the information for each process
-process_nums = [int(s) for s in process_line.split() if s.isdigit()]
-
-#in the case there are more than one process use the while loop
-#otherwise it isn't neccesary
-
-#now create an array of processes with the information provided by process_list
-process_array = []
-
-if(process_nums != 1):
-
-	process_list = []
-	temp_array = []
-
-	#now divide each set of numbers into their respective process
-	process_count = 0
-	index = 0
-
-	#this while loop simply split the array up and puts them into individual arrays for later
-	#conversion to processes
-	while(process_count < num_process):
-
-		
-
-		temp_array.append(process_nums[index])
-
-		index += 1
-
-		if((index % 4) == 0):
-			process_count += 1
-			process_list.append(temp_array)
-			temp_array = []
-
-	for i in range(0, len(process_list)):
-
-		#dont do the randomOS function here because you recalculate that every cycle
-		process = Process(int(process_list[i][0]),int(process_list[i][1]),int(process_list[i][2]),int(process_list[i][3]))
-
-		process_array.append(process)
-
-else:
-	process_array.append(Process(int(process_nums[0]),int(process_list[1]),int(process_nums[2]),int(process_nums[3])))
-
-
-
-#sort the array by checking arrival times
-def bubble_sort_arrival(arr):
-    check = True
-    while check:
-        check = False
-        for i in range(0,len(arr)-1):
-            if arr[i].arrival_time > arr[i+1].arrival_time:
-                arr[i], arr[i+1] = arr[i+1], arr[i]
-                check = True
-
-#print out the initial heading have to convert the array into a string
-header_string = "The original input was: " + str(num_process) + " "
-
-for i in range(0,len(process_array)):
-	header_string += process_array[i].toString() + " "
-
-header_string += "\n" + "The sorted input is: " + str(num_process) + " "
-
-bubble_sort_arrival(process_array)
-
-#now set the index of each process later so that we can properly print out their details and keep track of them
-for i in range(0,len(process_array)):
-	process_array[i].index = i
-
-for i in range(0,len(process_array)):
-	header_string += process_array[i].toString() + " "
-
-print(header_string)
-print()
-
-if(VERBOSE_FLAG):
-	print("This detailed printout gives the state and remaining burst for each process")
+	print(header_string)
 	print()
+
+	return process_array,num_process,VERBOSE_FLAG
 
 
 
 def first_in_first_out(process_array):
 
 	all_terminated = False
+
+	if(VERBOSE_FLAG):
+		print("This detailed printout gives the state and remaining burst for each process")
+		print()
 
 	
 
@@ -628,13 +626,14 @@ def first_in_first_out(process_array):
 		process_array[i].summary()
 	full_summary(process_array,num_process)
 
-#first_in_first_out(process_array)
 
 def round_robbin(process_array,quantum):
 
 	all_terminated = False
 
-	
+	if(VERBOSE_FLAG):
+		print("This detailed printout gives the state and remaining burst for each process")
+		print()
 
 	#index = 0 means running, index > 0 means ready, not within the queue means blocked
 	process_queue = []
@@ -1060,9 +1059,13 @@ def round_robbin(process_array,quantum):
 		process_array[i].summary()
 	full_summary(process_array,num_process)
 
-#round_robbin(process_array,2)
+
 
 def shortest_job_first(new_process_array):
+
+	if(VERBOSE_FLAG):
+		print("This detailed printout gives the state and remaining burst for each process")
+		print()
 
 	all_terminated = False
 
@@ -1498,13 +1501,15 @@ def shortest_job_first(new_process_array):
 		print_array[i].summary()
 	full_summary(print_array,num_process)
 
-#shortest_job_first(process_array)
+
 
 def highest_penalty_ratio(process_array):
 
 	all_terminated = False
 
-	
+	if(VERBOSE_FLAG):
+		print("This detailed printout gives the state and remaining burst for each process")
+		print()
 
 	#index = 0 means running, index > 0 means ready, not within the queue means blocked
 	process_queue = []
@@ -1976,7 +1981,25 @@ def highest_penalty_ratio(process_array):
 		process_array[i].summary()
 	full_summary(process_array,num_process)
 
-highest_penalty_ratio(process_array)	
+
+
+process_array,num_process,VERBOSE_FLAG = start_up()
+first_in_first_out(process_array)
+print()
+
+process_array,num_process,VERBOSE_FLAG = start_up()
+round_robbin(process_array,2)
+print()
+
+process_array,num_process,VERBOSE_FLAG = start_up()
+shortest_job_first(process_array)
+print()
+
+process_array,num_process,VERBOSE_FLAG = start_up()
+highest_penalty_ratio(process_array)
+print()
+
+
 
 
 
