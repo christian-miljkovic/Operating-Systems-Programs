@@ -1,0 +1,45 @@
+Notes for Lab 3 - Bankers Algorithm
+
+Implementing FIFO (Optimistic) Banker -> satifsy a request if possible, if not make the task wait, when a release occurs try to satisfy pending requests in a FIFO manner
+
+Implementing Dijkstra Banker
+
+You can just print the output
+
+T - number of tasks
+R - number of resource types, followed by the number of units present of each resource type 
+Inputs - represent the next activity of a specifc task 
+	-activities: initiate,request, compute, release, and terminate
+
+*if we set limits on T or R then we have to doc this in README
+*print an error if it does not
+-time is run in cycles
+-manager can process one activity (initiate,request, or release) for each task 
+***Terminate activvity does not require a cycle
+-initiate must preceed all other for that task:
+	initiate task-number resource-type intial-claim
+
+	request task-number resource-type number-requeststed
+
+	release task-number resource-type number-released
+
+	compute task-number resource-type unused -> process computing wont make requests or releases
+
+	terminate task-number unused unused
+
+Comment the methods, the safety checks, the data structures
+
+Input is interspread so its not uniform
+
+Bankers Banker: For error checks (when initial claim is too high) -> make method
+Optimistic Banker: For Deadlocks make a method -> when all non-terminated tasks have outstanding requests that the manager cannot satisfy then there is a deadlock and you only have to worry about when you find it at that cycle
+
+***Items are not return at time n, but rather n+1
+
+
+
+
+
+*** OUTPUT ***
+print for each task, the time taken, the waiting time, percentage of time spentwaiting
+print total time for all tasks, the total waiting time, overall percentage of time spent waiting
