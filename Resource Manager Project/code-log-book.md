@@ -16,4 +16,6 @@
 
 
 #3 Desrcibe the process of carrying out the method
+-Modularity helps a lot when it comes to debugging, however, one of the issues that I always run into is probably coming from not thinking of the problem beforehand. For example, I realized that the deadlock method I was implmenting wasn't totally correct, or even more so realizing that i had to account for mutliple resources which is now going to make me have to go back and fix things, then on top of that the most important miss I had was realizing it was FIFO which means waiting tasks had first priority. This definitely increases the time spent coding, which I should figure out a way to avoid in the future. 
+
 #4 Record what happened, and ask how it could be improved

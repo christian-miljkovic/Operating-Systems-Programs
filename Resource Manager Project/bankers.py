@@ -6,14 +6,20 @@ import pdb
 #this is the class that will maintain the properties for each task
 class Task:
 
-	def __init__(self,task_num):
+	def __init__(self,task_num,resource_num):
 		self.task_num = task_num
 		self.time_take = 0
 		self.waiting_time = 0
 		self.activity_number = 0
 		self.terminated = False
 		self.resource_in_use = dict()
-		self.state = 'unstarted'
+		self.state = dict()
+		self.final_state = 'unfinished'
+		self.current_wait_time = 0
+
+		#this is because if we have multiple resources we will need to have different states for them
+		for i in range(1,resource_num+1):
+			self.state[i] = 'unstarted' 
 
 		#we will use a list of commands that each task
 		#will hope to perform during each cycle 
@@ -29,7 +35,7 @@ class Task:
 
 
 	def toString(self):
-		return 'Task '+str(self.task_num) + ',' + self.state
+		return 'Task '+str(self.task_num)
 
 
 #this method looks through an array of tasks and finds the correct task
@@ -86,7 +92,7 @@ def start_up():
 
 	
 	for i in range(1,num_task+1):
-		task = Task(i)
+		task = Task(i,num_resources)
 		task_array.append(task)
 
 	
@@ -125,7 +131,7 @@ def start_up():
 
 #this method checks to make sure that there is enough resources 
 #to give out if requested, and if there is enough it will allocate the resource
-def request_resource(resource_req,resource_type,resources,task):
+def request_resource(resource_req,resource_type,resources,task,cycle):
 
 	resource_left = resources[resource_type]
 
@@ -142,29 +148,38 @@ def request_resource(resource_req,resource_type,resources,task):
 		#update the task indexing element and get rid of the top activity line
 		# del task.list_of_tasks[task.activity_index]
 		task.activity_index += 1
+		task.current_wait_time = 0
+		task.state[resource_type]  = 'running'
+		print(task.toString() + ' Accepted for resource ' + str(resource_type) + ' at cycle '+ str(cycle))
+
 
 	else:
 		task.waiting_time += 1
-		task.state = 'waiting'
+		task.current_wait_time += 1
+		task.state[resource_type] = 'waiting'
+		print(task.toString() + ' Rejected for resource ' + str(resource_type) + ' at cycle '+ str(cycle))
 
 
 
 #this method returns the resources back to the "general pool" by subtracting what the 
 #current task has as input, we also use temp_resources because we have to wait a whole cycle
 #before another task can use the resources so this acts as an artifical time delay
-def release_resource(resource_type,temp_resources,task):
+def release_resource(resource_type,temp_resources,task,cycle):
 
-	resources_used = task.resource_in_use[resource_type]
-	del task.resource_in_use[resource_type]
+	if(resource_type in task.resource_in_use):
+		resources_used = task.resource_in_use[resource_type]
+		del task.resource_in_use[resource_type]
 
-	if(resource_type in temp_resources):
-		temp_resources[resource_type] += resources_used
-	else:
-		temp_resources[resource_type] = resources_used	
+		if(resource_type in temp_resources):
+			temp_resources[resource_type] += resources_used
+		else:
+			temp_resources[resource_type] = resources_used	
 
-	#update the task indexing element and get rid of the top activity line
-	# del task.list_of_tasks[task.activity_index]
+		#update the task indexing element and get rid of the top activity line
+		# del task.list_of_tasks[task.activity_index]
 	task.activity_index += 1
+	task.current_wait_time = 0
+	print(task.toString() + ' Released for resource ' + str(resource_type) + ' at cycle '+ str(cycle))
 
 
 #this method will reconcile the temp_resource dict and resource dict, and we 
@@ -176,12 +191,21 @@ def reconcile_resources(resources,temp_resources):
 
 #this method checks to see if there is a deadlock of the resource
 #and if there is then it will abort the lowest numbered deadlocked task and return true otherwise false
-def check_deadlock(resource_type,resources,task_array,num_task):
+def check_deadlock(resource_type,resources,task_array,num_task,temp_resources):
+
 
 	resource_left = resources[resource_type]
 
+	temp_resources_left = 100
+
+	#just in case in the second round there will be resources available
+	if(resource_type in temp_resources):
+		temp_resources_left = temp_resources[resource_type]
+
+
 	#this will keep record of how many tasks may potentially be in deadlock
 	count_dead_lock = 0
+	count_terminated = 0
 	abort_list = []	
 
 
@@ -192,16 +216,26 @@ def check_deadlock(resource_type,resources,task_array,num_task):
 		#if this ends up being the same as the resource and it has previously waited 
 		#for the resource then we know there is a deadlock 
 		activity_line = task_array[i].list_of_tasks[task_array[i].activity_index]
-		if((activity_line[0] == 'request') and (activity_line[2] > resource_left)):
+		if(((task_array[i].state[resource_type] != 'terminated') and (task_array[i].state[resource_type] != 'aborted')) and (activity_line[0] == 'request') and (activity_line[2] > resource_left or activity_line[2] > temp_resources_left)):
 
-			if(task_array[i].state == 'waiting'):
+			if(task_array[i].state[resource_type] == 'waiting'):
 				count_dead_lock += 1
-				abort_list.append(task_array[i])			
+				abort_list.append(task_array[i])
 
-	if(count_dead_lock == num_task):
-		release_resource(resource_type,resources,abort_list[0])
+		elif(task_array[i].state[resource_type] == 'terminated' or (task_array[i].final_state == 'aborted')):
+			count_terminated += 1
+
+
+	if(count_dead_lock == (num_task-count_terminated) and (count_dead_lock != 0)):
+
+		#check to make sure that the task has resources regardless whether it will be aborted
+		if(resource_type in abort_list[0].resource_in_use):
+			release_resource(resource_type,resources,abort_list[0])
+
+		#otherwise
 		abort_list[0].terminated = True
-		abort_list[0].state = 'aborted'
+		abort_list[0].state[resource_type] = 'aborted'
+		abort_list[0].final_state = 'aborted'
 
 		#there was a deadlock
 		return True
@@ -215,6 +249,7 @@ def check_deadlock(resource_type,resources,task_array,num_task):
 #this method creates the output for the program as specified by the docs
 def print_output(method,task_array):
 
+
 	total_wait = 0
 	sum_finish = 0
 
@@ -222,7 +257,7 @@ def print_output(method,task_array):
 
 	for i in range(0,len(task_array)):
 
-		if(task_array[i].state == 'aborted'):
+		if(task_array[i].final_state == 'aborted'):
 			output_string += 'Task ' + str(task_array[i].task_num) + '\t\t' + 'aborted\n'
 
 		else:
@@ -235,108 +270,159 @@ def print_output(method,task_array):
 
 	print(output_string)
 
+
+def allocation_process(resource_type,task_array,resources,temp_resources,cycle):
+
+
+	#check if we have to initiate any of the tasks
+	for i in range(0,len(task_array)):
+
+		#this is going to have to be like state+i 
+		if(task_array[i].state[resource_type] == 'unstarted'):
+
+			current_task = task_array[i].list_of_tasks[task_array[i].activity_index]
+
+			# current_resource = current_task[1]
+			# num_requested = current_task[2]
+
+		#this is if we were aborting immediately after seeing what was initially requested
+		# if(num_requested > resources[current_resource]):
+		# 	task_array[i].state = 'aborted'
+
+		# else:
+			task_array[i].state[resource_type] = 'started'			
+
+			#then incrementing the index for the next line
+			task_array[i].activity_index += 1
+
+
+		#deal with a task that was aborted here
+		elif(task_array[i].state[resource_type] == 'aborted'):
+			# #this is just so we don't continuously update the time the task finished
+			# if(task_array[i].time_take == 0):
+			# 	task_array[i].time_take = cycle 			
+			pass
+
+		#otherwise we begin to do the other requests/releases etc.
+		else:
+
+
+			current_task = task_array[i].list_of_tasks[task_array[i].activity_index]
+
+			current_activity = current_task[0]
+			current_resource = current_task[1]
+			num_requested = current_task[2]
+
+			#now determine which function to use based upon the activity retrieved
+			if(current_activity == 'request'):
+
+				request_resource(num_requested,current_resource,resources,task_array[i],cycle)
+
+			elif(current_activity == 'release'):
+
+				release_resource(current_resource,temp_resources,task_array[i],cycle)
+
+			else:
+
+				task_array[i].state[resource_type] = 'terminated'
+
+				# #this is just so we don't continuously update the time the task finished
+				# if(task_array[i].time_take == 0):
+				# 	task_array[i].time_take = cycle 
+
+
+def prioritize_dict(resource_type,task_array):
+
+	ret_array = []
+
+	for i in range(0,len(task_array)):
+
+		if(task_array[i].state[resource_type] == 'waiting'):
+
+			if(len(ret_array) == 0):
+				ret_array.append(task_array[i])
+			else:
+
+
+				for j in range(0,len(ret_array)):
+
+					if(task_array[i].current_wait_time > ret_array[j].current_wait_time):
+						ret_array.insert(j,task_array[i])
+						break
+						
+					if(j == len(ret_array)-1):
+						ret_array.append(task_array[i])
+
+
+	#add the remaining
+	for i in range(0,len(task_array)):
+		if(task_array[i].state[resource_type] != 'waiting'):
+			ret_array.append(task_array[i])
+
+	return ret_array
+
 def fifo_manager(task_array,num_task,resources,num_resources):
 
 	cycle = 0
 
-	total_finish = 0
-
 	finished = False
+
 
 	while(finished != True):
 
 		#use this to delay the releasing of resources
 		temp_resources = dict()
 
-		# pdb.set_trace()
-
-		#check if we have to initiate any of the tasks
-		for i in range(0,len(task_array)):
-
-
-			#LOOK AT THE NUMBER OF RESOURCES IF THERE ARE MORE THAN ONE
-			#THEN HAVE TWO COLUMNS TO REPRESENT UNSTARED SECTIONS
-			#MOST LIKELY WILL HAVE TO MAKE THIS PART THAT DOES THE ACTUAL 
-			#FIFO PART INTO ONE FUNCTION AND RUN IT MULTIPLE TIMES
-			if(task_array[i].state == 'unstarted'):
-
-				current_task = task_array[i].list_of_tasks[task_array[i].activity_index]
-
-				current_resource = current_task[1]
-				num_requested = current_task[2]
-
-				if(num_requested > resources[current_resource]):
-					task_array[i].state = 'aborted'
-
-				else:
-					task_array[i].state = 'started'			
-
-					#then incrementing the index for the next line
-					task_array[i].activity_index += 1
-
-
-			#deal with a task that was aborted here
-			elif(task_array[i].state == 'aborted'):
-				#this is just so we don't continuously update the time the task finished
-				if(task_array[i].time_take == 0):
-					task_array[i].time_take = cycle 
-
-					#also add to the total tally of finished tasks
-					total_finish += 1				
-
-
-			#otherwise we begin to do the other requests/releases etc.
-			else:
-
-
-				current_task = task_array[i].list_of_tasks[task_array[i].activity_index]
-
-				current_activity = current_task[0]
-				current_resource = current_task[1]
-				num_requested = current_task[2]
-
-				#now determine which function to use based upon the activity retrieved
-				if(current_activity == 'request'):
-
-					request_resource(num_requested,current_resource,resources,task_array[i])
-					# task_array[i].activity_index += 1
-
-				elif(current_activity == 'release'):
-
-					release_resource(current_resource,temp_resources,task_array[i])
-					# task_array[i].activity_index += 1
-
-				else:
-
-					task_array[i].state = 'terminated'
-
-					#this is just so we don't continuously update the time the task finished
-					if(task_array[i].time_take == 0):
-						task_array[i].time_take = cycle 
-
-						#also add to the total tally of finished tasks
-						total_finish += 1	
-
-						#and as a fail safe check to make sure that there aren't any resources that haven't been released
-						# for i in resources:
-						# 	release_resource(i,resources,task_array[i])		
-
-		cycle += 1
-
-		#now check to see if there is a deadlock at the end of the cycle by looking
-		#through every resource
 		for i in resources:
 
-			#we keep it in a while loop in order to see if we have to abort multiple tasks
-			while(check_deadlock(i,resources,task_array,num_task)):
-				pass
+			temp_array = prioritize_dict(i,task_array)
+
+			allocation_process(i,temp_array,resources,temp_resources,cycle)
+	
+			#now check to see if there is a deadlock at the end of the cycle by looking
+			#through every resource
+			for i in resources:
+
+				#we keep it in a while loop in order to see if we have to abort multiple tasks
+				while(check_deadlock(i,resources,task_array,num_task,temp_resources)):
+					pass
+				
+			
+		#### validation part ####	
+
+		#check to see if a task has fully been terminated aka done with all of its resources
+		for i in range(0,len(task_array)):
+			#number of resources termianted needs to equal number of resources
+			num_terminated = 0
+			for j in resources:
+			
+				if(task_array[i].final_state != 'aborted' and task_array[i].state[j] == 'terminated'):
+					num_terminated += 1
+
+			if(num_terminated == num_resources):
+				task_array[i].final_state = 'terminated'
 				
 
+		total_finish = 0
+		
 		#now check to see if every task has finished
+		for i in range(0,len(task_array)):
+			if(task_array[i].final_state == 'terminated' or task_array[i].final_state == 'aborted'):
+				#this is in order to make sure that we are not repeatedly changing the finish time
+				if(task_array[i].time_take == 0):
+					task_array[i].time_take = cycle
+
+				total_finish += 1
+
+
 		if(total_finish == num_task):
 			finished = True
 
 		reconcile_resources(resources,temp_resources)
+
+		#we add by num_resources because within the while loop we are performing the actions
+		#of multiple resources in parallel
+		cycle += num_resources
 
 
 
@@ -350,8 +436,5 @@ print_output('FIFO',task_array)
 # Stuff to easily print out
 # task_array[i].toString()
 # task_array[i].resource_in_use
-
-
-
 
 
