@@ -131,7 +131,7 @@ def start_up():
 
 #this method checks to make sure that there is enough resources 
 #to give out if requested, and if there is enough it will allocate the resource
-def request_resource(resource_req,resource_type,resources,task,cycle):
+def request_resource(resource_req,resource_type,resources,task):
 
 	resource_left = resources[resource_type]
 
@@ -150,21 +150,21 @@ def request_resource(resource_req,resource_type,resources,task,cycle):
 		task.activity_index += 1
 		task.current_wait_time = 0
 		task.state[resource_type]  = 'running'
-		print(task.toString() + ' Accepted for resource ' + str(resource_type) + ' at cycle '+ str(cycle))
+		
 
 
 	else:
 		task.waiting_time += 1
 		task.current_wait_time += 1
 		task.state[resource_type] = 'waiting'
-		print(task.toString() + ' Rejected for resource ' + str(resource_type) + ' at cycle '+ str(cycle))
+		
 
 
 
 #this method returns the resources back to the "general pool" by subtracting what the 
 #current task has as input, we also use temp_resources because we have to wait a whole cycle
 #before another task can use the resources so this acts as an artifical time delay
-def release_resource(resource_type,temp_resources,task,cycle):
+def release_resource(resource_type,temp_resources,task):
 
 	if(resource_type in task.resource_in_use):
 		resources_used = task.resource_in_use[resource_type]
@@ -179,7 +179,6 @@ def release_resource(resource_type,temp_resources,task,cycle):
 		# del task.list_of_tasks[task.activity_index]
 	task.activity_index += 1
 	task.current_wait_time = 0
-	print(task.toString() + ' Released for resource ' + str(resource_type) + ' at cycle '+ str(cycle))
 
 
 #this method will reconcile the temp_resource dict and resource dict, and we 
@@ -273,12 +272,48 @@ def print_output(method,task_array):
 
 def allocation_process(resource_type,task_array,resources,temp_resources,cycle):
 
+	#pdb.set_trace()
+
 
 	#check if we have to initiate any of the tasks
 	for i in range(0,len(task_array)):
 
+		compute_flag = False
+
+		current_task = task_array[i].list_of_tasks[task_array[i].activity_index]
+
+		current_activity = current_task[0]
+		current_resource = current_task[1]
+		num_requested = current_task[2]	
+		print(task_array[i].toString(),current_activity,current_resource,num_requested)	
+		
+		#pdb.set_trace()
+
+		for j in task_array[i].list_of_tasks:
+			if(task_array[i].list_of_tasks[j][0] == 'compute'):
+				compute_flag = True
+
+		if(current_activity == 'compute' and task_array[i].final_state == 'computing'):
+			#in this case num_requested is the wait time
+			print(task_array[i].list_of_tasks[task_array[i].activity_index][1])
+			if(num_requested > 0):
+				task_array[i].waiting_time += 1
+				task_array[i].list_of_tasks[task_array[i].activity_index][2] = task_array[i].list_of_tasks[task_array[i].activity_index][2] - 1
+
+
+			else:
+				task_array[i].final_state = 'running'
+				task_array[i].activity_index += 1	
+
+		#this is when we see it for the first time
+		elif(current_activity == 'compute' and task_array[i].final_state != 'computing'):
+			task_array[i].final_state = 'computing'
+
+		elif(current_resource != resource_type and (current_resource != 0)):
+			continue		
+
 		#this is going to have to be like state+i 
-		if(task_array[i].state[resource_type] == 'unstarted'):
+		elif(task_array[i].state[resource_type] == 'unstarted'):
 
 			current_task = task_array[i].list_of_tasks[task_array[i].activity_index]
 
@@ -303,24 +338,24 @@ def allocation_process(resource_type,task_array,resources,temp_resources,cycle):
 			# 	task_array[i].time_take = cycle 			
 			pass
 
+
 		#otherwise we begin to do the other requests/releases etc.
 		else:
 
 
-			current_task = task_array[i].list_of_tasks[task_array[i].activity_index]
-
-			current_activity = current_task[0]
-			current_resource = current_task[1]
-			num_requested = current_task[2]
-
 			#now determine which function to use based upon the activity retrieved
 			if(current_activity == 'request'):
 
-				request_resource(num_requested,current_resource,resources,task_array[i],cycle)
+				request_resource(num_requested,current_resource,resources,task_array[i])
 
 			elif(current_activity == 'release'):
 
-				release_resource(current_resource,temp_resources,task_array[i],cycle)
+				release_resource(current_resource,temp_resources,task_array[i])
+
+
+				if(task_array[i].list_of_tasks[task_array[i].activity_index][0] == 'terminate' and compute_flag == True):
+					task_array[i].final_state = 'terminated'
+
 
 			else:
 
@@ -329,7 +364,7 @@ def allocation_process(resource_type,task_array,resources,temp_resources,cycle):
 				# #this is just so we don't continuously update the time the task finished
 				# if(task_array[i].time_take == 0):
 				# 	task_array[i].time_take = cycle 
-
+	print()
 
 def prioritize_dict(resource_type,task_array):
 
@@ -418,6 +453,8 @@ def fifo_manager(task_array,num_task,resources,num_resources):
 		if(total_finish == num_task):
 			finished = True
 
+		print(resources,temp_resources)
+		
 		reconcile_resources(resources,temp_resources)
 
 		#we add by num_resources because within the while loop we are performing the actions
@@ -433,8 +470,5 @@ fifo_manager(task_array,num_task,resources,num_resources)
 print_output('FIFO',task_array)
 
 
-# Stuff to easily print out
-# task_array[i].toString()
-# task_array[i].resource_in_use
 
 
