@@ -467,7 +467,52 @@ task_array,num_task,resources,num_resources  = start_up()
 
 fifo_manager(task_array,num_task,resources,num_resources)
 
-print_output('FIFO',task_array)
+#print_output('FIFO',task_array)
+
+#restart the system again
+task_array,num_task,resources,num_resources  = start_up()
+
+def bankers_manager(task_array,num_task,resources,num_resources):
+
+	available_array = []
+	max_array = []
+	allocation_array = []
+	need_array = []
+
+
+	#populate the available array
+	for i in resources:
+		available_array.append(resources[i])
+
+	#populate the max_array and abort any tasks that require more than available resources
+	for i in range(0,len(task_array)):
+		max_task_array = dict()
+
+		for j in task_array[i].list_of_tasks:
+
+			if((task_array[i].list_of_tasks[j][0] == 'initiate')):
+
+				max_task_array[task_array[i].list_of_tasks[1]] = task_array[i].list_of_tasks[2]
+
+		max_array.append(max_task_array)
+
+	#populate the allocation array
+	for i in range(0,len(task_array)):
+
+		allocate_task = dict()
+
+		for j in task_array[i].list_of_tasks:
+
+			if((task_array[i].list_of_tasks[j][0] == 'initiate')):
+				allocate_task[task_array[i].list_of_tasks[j][1]] = 0
+
+
+
+bankers_manager(task_array,num_task,resources,num_resources)
+
+
+
+
 
 
 
