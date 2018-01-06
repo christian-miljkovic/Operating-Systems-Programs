@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import sys
 import pdb
+import numpy as np
 
 
 #this is the class that will maintain the properties for each task
@@ -285,7 +286,7 @@ def allocation_process(resource_type,task_array,resources,temp_resources,cycle):
 		current_activity = current_task[0]
 		current_resource = current_task[1]
 		num_requested = current_task[2]	
-		print(task_array[i].toString(),current_activity,current_resource,num_requested)	
+		
 		
 		#pdb.set_trace()
 
@@ -295,7 +296,7 @@ def allocation_process(resource_type,task_array,resources,temp_resources,cycle):
 
 		if(current_activity == 'compute' and task_array[i].final_state == 'computing'):
 			#in this case num_requested is the wait time
-			print(task_array[i].list_of_tasks[task_array[i].activity_index][1])
+			
 			if(num_requested > 0):
 				task_array[i].waiting_time += 1
 				task_array[i].list_of_tasks[task_array[i].activity_index][2] = task_array[i].list_of_tasks[task_array[i].activity_index][2] - 1
@@ -364,7 +365,7 @@ def allocation_process(resource_type,task_array,resources,temp_resources,cycle):
 				# #this is just so we don't continuously update the time the task finished
 				# if(task_array[i].time_take == 0):
 				# 	task_array[i].time_take = cycle 
-	print()
+	
 
 def prioritize_dict(resource_type,task_array):
 
@@ -453,7 +454,6 @@ def fifo_manager(task_array,num_task,resources,num_resources):
 		if(total_finish == num_task):
 			finished = True
 
-		print(resources,temp_resources)
 		
 		reconcile_resources(resources,temp_resources)
 
@@ -467,10 +467,39 @@ task_array,num_task,resources,num_resources  = start_up()
 
 fifo_manager(task_array,num_task,resources,num_resources)
 
-#print_output('FIFO',task_array)
+print_output('FIFO',task_array)
 
 #restart the system again
 task_array,num_task,resources,num_resources  = start_up()
+
+#algorithm determines whether the system is in a safe state or not, returns
+#true if it is and false if it is not
+def safety_algo(available_array,max_array,allocation_array,need_array,task_array):
+
+	available_resources = np.array(available_array)
+	max_demand = np.array(max_array)
+	currently_allocated = np.array(allocation_array)
+	need_array = np.array(need_array)
+
+	total_available = available_resources - np.sum(currently_allocated, axis=0)
+
+	running = np.ones(num_task)
+
+	while(np.count_nonzero(running) > 0):
+	    one_allocated = False
+	    for p in range(num_task):
+	    	if(running[p]):
+	            if(all(i >= 0 for i in total_available - (max_demand[p] - currently_allocated[p]))):
+	                one_allocated = True
+	                running[p] = 0
+	                total_available += currently_allocated[p]
+	    if(not one_allocated):
+	        return False
+	        
+	return True
+
+
+
 
 def bankers_manager(task_array,num_task,resources,num_resources):
 
@@ -486,30 +515,100 @@ def bankers_manager(task_array,num_task,resources,num_resources):
 
 	#populate the max_array and abort any tasks that require more than available resources
 	for i in range(0,len(task_array)):
-		max_task_array = dict()
+		max_task_array = []
 
 		for j in task_array[i].list_of_tasks:
 
 			if((task_array[i].list_of_tasks[j][0] == 'initiate')):
 
-				max_task_array[task_array[i].list_of_tasks[1]] = task_array[i].list_of_tasks[2]
+				max_task_array.append(task_array[i].list_of_tasks[j][2]) 
 
 		max_array.append(max_task_array)
 
 	#populate the allocation array
 	for i in range(0,len(task_array)):
 
-		allocate_task = dict()
+		allocate_task = []
 
 		for j in task_array[i].list_of_tasks:
 
 			if((task_array[i].list_of_tasks[j][0] == 'initiate')):
-				allocate_task[task_array[i].list_of_tasks[j][1]] = 0
+				allocate_task.append(0)
+		allocation_array.append(allocate_task)
 
+	#populate the need array which as of now is going to look like the max_array
+	for i in range(0,len(task_array)):
+		need_task_array = []
+
+		for j in task_array[i].list_of_tasks:
+
+			if((task_array[i].list_of_tasks[j][0] == 'initiate')):
+
+				need_task_array.append(task_array[i].list_of_tasks[j][2])
+
+		need_array.append(need_task_array)
+
+
+	cycle = 0
+
+	finished = False
+
+
+	while(finished != True):
+
+		#use this to delay the releasing of resources
+		temp_resources = dict()
+
+		for i in resources:
+
+			if(safety_algo(available_array,max_array,allocation_array,need_array,task_array)):
+
+				allocation_process(i,task_array,resources,temp_resources,cycle)
+			else:
+				check_deadlock(i,resources,task_array,num_task,temp_resources)
+				
+			
+		#### validation part ####	
+
+		#check to see if a task has fully been terminated aka done with all of its resources
+		for i in range(0,len(task_array)):
+			#number of resources termianted needs to equal number of resources
+			num_terminated = 0
+			for j in resources:
+			
+				if(task_array[i].final_state != 'aborted' and task_array[i].state[j] == 'terminated'):
+					num_terminated += 1
+
+			if(num_terminated == num_resources):
+				task_array[i].final_state = 'terminated'
+				
+
+		total_finish = 0
+		
+		#now check to see if every task has finished
+		for i in range(0,len(task_array)):
+			if(task_array[i].final_state == 'terminated' or task_array[i].final_state == 'aborted'):
+				#this is in order to make sure that we are not repeatedly changing the finish time
+				if(task_array[i].time_take == 0):
+					task_array[i].time_take = cycle
+
+				total_finish += 1
+
+
+		if(total_finish == num_task):
+			finished = True
+
+		
+		reconcile_resources(resources,temp_resources)
+
+		#we add by num_resources because within the while loop we are performing the actions
+		#of multiple resources in parallel
+		cycle += num_resources
 
 
 bankers_manager(task_array,num_task,resources,num_resources)
 
+print_output('Bankers',task_array)
 
 
 
